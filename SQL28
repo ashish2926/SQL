@@ -1,0 +1,263 @@
+-- joins_practice_set.sql
+-- Advanced SQL JOIN Queries for GitHub Portfolio
+-- Ashish - BTech Computer Science 7th Semester
+-- SQL Joins Practice Set (Different from previous examples)
+
+-- ======================================================
+-- SAMPLE SCHEMA SETUP (Run once to create tables)
+-- ======================================================
+CREATE TABLE IF NOT EXISTS departments (
+    dept_id INT PRIMARY KEY,
+    dept_name VARCHAR(50),
+    location_id INT
+);
+
+CREATE TABLE IF NOT EXISTS employees (
+    emp_id INT PRIMARY KEY,
+    first_name VARCHAR(30),
+    last_name VARCHAR(30),
+    dept_id INT,
+    manager_id INT,
+    salary DECIMAL(10,2),
+    hire_date DATE,
+    FOREIGN KEY (dept_id) REFERENCES departments(dept_id)
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+    project_id INT PRIMARY KEY,
+    project_name VARCHAR(100),
+    start_date DATE,
+    end_date DATE,
+    dept_id INT,
+    FOREIGN KEY (dept_id) REFERENCES departments(dept_id)
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(100),
+    city VARCHAR(50)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE,
+    total_amount DECIMAL(10,2),
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
+-- Sample Data (INSERT ONCE)
+INSERT IGNORE INTO departments VALUES 
+(1,'Engineering',101),(2,'HR',102),(3,'Sales',103),(4,'Marketing',104);
+
+INSERT IGNORE INTO employees VALUES 
+(101,'Rahul','Sharma',1,105,85000,'2023-01-15'),
+(102,'Priya','Mehta',1,105,92000,'2022-06-10'),
+(103,'Amit','Kumar',2,106,65000,'2023-03-20'),
+(104,'Sneha','Patel',3,NULL,78000,'2022-11-05'),
+(105,'Vikram','Singh',1,NULL,110000,'2021-05-12'),
+(106,'Deepa','Gupta',2,NULL,88000,'2021-08-18');
+
+-- ======================================================
+-- 1. INNER JOIN - Employees with Department Names
+-- ======================================================
+SELECT 
+    e.emp_id,
+    CONCAT(e.first_name,' ',e.last_name) AS employee_name,
+    d.dept_name,
+    e.salary
+FROM employees e
+INNER JOIN departments d ON e.dept_id = d.dept_id
+ORDER BY e.salary DESC;
+
+-- ======================================================
+-- 2. LEFT JOIN - All Departments + Employee Count
+-- ======================================================
+SELECT 
+    d.dept_name,
+    COUNT(e.emp_id) AS emp_count,
+    ROUND(AVG(e.salary),0) AS avg_salary
+FROM departments d
+LEFT JOIN employees e ON d.dept_id = e.dept_id
+GROUP BY d.dept_id, d.dept_name
+ORDER BY emp_count DESC;
+
+-- ======================================================
+-- 3. RIGHT JOIN - All Employees + Their Managers
+-- ======================================================
+SELECT 
+    e.first_name AS employee,
+    m.first_name AS manager,
+    e.salary
+FROM employees e
+RIGHT JOIN employees m ON e.manager_id = m.emp_id
+ORDER BY m.emp_id;
+
+-- ======================================================
+-- 4. SELF JOIN - Employee-Manager Hierarchy
+-- ======================================================
+SELECT 
+    e1.first_name AS employee,
+    e2.first_name AS manager,
+    e3.first_name AS grand_manager
+FROM employees e1
+LEFT JOIN employees e2 ON e1.manager_id = e2.emp_id
+LEFT JOIN employees e3 ON e2.manager_id = e3.emp_id
+ORDER BY e1.emp_id;
+
+-- ======================================================
+-- 5. FULL OUTER JOIN (MySQL Compatible)
+-- ======================================================
+SELECT 
+    COALESCE(e.emp_id, 'N/A') AS emp_id,
+    COALESCE(e.first_name, 'N/A') AS employee,
+    COALESCE(d.dept_name, 'No Dept') AS department
+FROM employees e
+FULL OUTER JOIN departments d ON e.dept_id = d.dept_id
+
+UNION ALL
+
+SELECT 
+    e.emp_id,
+    e.first_name,
+    d.dept_name
+FROM employees e
+RIGHT JOIN departments d ON e.dept_id = d.dept_id
+WHERE e.emp_id IS NULL;
+
+-- ======================================================
+-- 6. CROSS JOIN - All Dept Combinations
+-- ======================================================
+SELECT 
+    d1.dept_name AS dept1,
+    d2.dept_name AS dept2
+FROM departments d1
+CROSS JOIN departments d2
+WHERE d1.dept_id < d2.dept_id;
+
+-- ======================================================
+-- 7. MULTI-TABLE JOIN - High Salary Employees by Location
+-- ======================================================
+SELECT 
+    e.first_name,
+    d.dept_name,
+    e.salary,
+    l.city
+FROM employees e
+JOIN departments d ON e.dept_id = d.dept_id
+JOIN locations l ON d.location_id = l.location_id
+WHERE e.salary > 80000;
+
+-- ======================================================
+-- 8. Window Function + JOIN - Rank by Salary per Dept
+-- ======================================================
+SELECT 
+    e.first_name,
+    d.dept_name,
+    e.salary,
+    DENSE_RANK() OVER (
+        PARTITION BY d.dept_id 
+        ORDER BY e.salary DESC
+    ) AS salary_rank
+FROM employees e
+JOIN departments d ON e.dept_id = d.dept_id
+ORDER BY d.dept_name, salary_rank;
+
+-- ======================================================
+-- 9. LEFT JOIN + Aggregation - Projects per Employee
+-- ======================================================
+SELECT 
+    e.first_name,
+    COUNT(p.project_id) AS project_count,
+    SUM(p.total_hours) AS total_hours
+FROM employees e
+LEFT JOIN employee_projects ep ON e.emp_id = ep.emp_id
+LEFT JOIN projects p ON ep.project_id = p.project_id
+GROUP BY e.emp_id, e.first_name
+HAVING project_count > 0
+ORDER BY total_hours DESC;
+
+-- ======================================================
+-- 10. ANTI-JOIN - Employees WITHOUT Projects
+-- ======================================================
+SELECT 
+    e.first_name,
+    e.last_name
+FROM employees e
+WHERE NOT EXISTS (
+    SELECT 1 
+    FROM employee_projects ep 
+    WHERE ep.emp_id = e.emp_id
+);
+
+-- ======================================================
+-- 11. Complex Business Query - Revenue by Department
+-- ======================================================
+SELECT 
+    d.dept_name,
+    COUNT(o.order_id) AS order_count,
+    SUM(o.total_amount) AS total_revenue,
+    AVG(o.total_amount) AS avg_order_value
+FROM departments d
+JOIN projects p ON d.dept_id = p.dept_id
+JOIN orders o ON p.project_id = o.project_id
+GROUP BY d.dept_id, d.dept_name
+ORDER BY total_revenue DESC;
+
+-- ======================================================
+-- 12. Conditional JOIN Logic
+-- ======================================================
+SELECT 
+    e.first_name,
+    CASE 
+        WHEN e.salary > 90000 THEN 'Senior'
+        WHEN e.salary > 70000 THEN 'Mid'
+        ELSE 'Junior'
+    END AS level,
+    d.dept_name
+FROM employees e
+JOIN departments d ON e.dept_id = d.dept_id
+WHERE e.hire_date > '2022-01-01';
+
+-- ======================================================
+-- 13. Date Range JOIN
+-- ======================================================
+SELECT 
+    e.first_name,
+    p.project_name,
+    p.start_date
+FROM employees e
+JOIN employee_projects ep ON e.emp_id = ep.emp_id
+JOIN projects p ON ep.project_id = p.project_id
+WHERE p.start_date BETWEEN '2023-01-01' AND '2023-12-31';
+
+-- ======================================================
+-- 14. Subquery in JOIN
+-- ======================================================
+SELECT 
+    e.first_name,
+    e.salary,
+    d.dept_name,
+    (SELECT AVG(salary) FROM employees WHERE dept_id = e.dept_id) AS dept_avg
+FROM employees e
+JOIN departments d ON e.dept_id = d.dept_id
+WHERE e.salary > (
+    SELECT AVG(salary)*1.2 FROM employees WHERE dept_id = e.dept_id
+);
+
+-- ======================================================
+-- 15. PIVOT-like with Conditional Aggregation
+-- ======================================================
+SELECT 
+    d.dept_name,
+    SUM(CASE WHEN e.salary < 70000 THEN 1 ELSE 0 END) AS junior_count,
+    SUM(CASE WHEN e.salary BETWEEN 70000 AND 90000 THEN 1 ELSE 0 END) AS mid_count,
+    SUM(CASE WHEN e.salary > 90000 THEN 1 ELSE 0 END) AS senior_count
+FROM departments d
+LEFT JOIN employees e ON d.dept_id = e.dept_id
+GROUP BY d.dept_id, d.dept_name;
+
+-- ======================================================
+-- CLEANUP (Optional)
+-- ======================================================
+-- DROP TABLE IF EXISTS employee_projects, projects, orders, customers, employees, departments, locations;
