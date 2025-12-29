@@ -1,0 +1,116 @@
+-- advanced_joins_practice.sql (CORRECTED VERSION)
+-- Comprehensive SQL JOIN examples - Fixed syntax for MySQL/PostgreSQL
+-- Covers INNER, LEFT, RIGHT, FULL, CROSS, SELF, and multi-table joins
+-- Author: Ashish (7th Sem BTech CS, Data Science learner)
+-- Fixed: FULL OUTER JOIN, ORDER BY NULLS, DBMS compatibility
+
+-- ===== 1. SAMPLE TABLES SETUP =====
+DROP TABLE IF EXISTS orders, customers, departments, employees;
+
+CREATE TABLE departments (
+    dept_id INT PRIMARY KEY,
+    dept_name VARCHAR(50)
+);
+
+CREATE TABLE employees (
+    emp_id INT PRIMARY KEY,
+    name VARCHAR(50),
+    dept_id INT,
+    manager_id INT,
+    salary DECIMAL(10,2)
+);
+
+CREATE TABLE customers (
+    cust_id INT PRIMARY KEY,
+    cust_name VARCHAR(50),
+    sales_rep_id INT
+);
+
+CREATE TABLE orders (
+    order_id INT PRIMARY KEY,
+    cust_id INT,
+    amount DECIMAL(10,2),
+    order_date DATE
+);
+
+-- Sample data
+INSERT INTO departments VALUES 
+(10, 'Engineering'), (20, 'Marketing'), (30, 'Sales'), (40, 'HR');
+
+INSERT INTO employees VALUES 
+(1, 'Alice', 10, NULL, 75000),
+(2, 'Bob', 20, 1, 65000),
+(3, 'Charlie', 10, 1, 70000),
+(4, 'Diana', NULL, NULL, 50000),
+(5, 'Eve', 30, 2, 55000);
+
+INSERT INTO customers VALUES 
+(101, 'Client A', 2), (102, 'Client B', 3), 
+(103, 'Client C', NULL), (104, 'Client D', 5);
+
+INSERT INTO orders VALUES 
+(1001, 101, 1500.00, '2025-12-01'),
+(1002, 101, 2500.00, '2025-12-15'),
+(1003, 102, 1800.00, '2025-12-20'),
+(1004, 104, 1200.00, '2025-12-25');
+
+-- ===== 2. INNER JOIN =====
+SELECT e.name AS employee, d.dept_name 
+FROM employees e 
+INNER JOIN departments d ON e.dept_id = d.dept_id;
+
+-- ===== 3. LEFT JOIN =====
+SELECT e.name AS employee, e.salary, d.dept_name 
+FROM employees e 
+LEFT JOIN departments d ON e.dept_id = d.dept_id
+ORDER BY e.name;
+
+-- ===== 4. RIGHT JOIN =====
+SELECT d.dept_name, COUNT(e.emp_id) AS emp_count
+FROM employees e 
+RIGHT JOIN departments d ON e.dept_id = d.dept_id 
+GROUP BY d.dept_id, d.dept_name;
+
+-- ===== 5. FULL OUTER JOIN (MySQL Compatible) =====
+SELECT e.name AS employee, d.dept_name 
+FROM employees e 
+LEFT JOIN departments d ON e.dept_id = d.dept_id
+UNION
+SELECT e.name, d.dept_name 
+FROM employees e 
+RIGHT JOIN departments d ON e.dept_id = d.dept_id
+WHERE e.emp_id IS NULL;[web:31][web:35]
+
+-- ===== 6. CROSS JOIN (LIMITED) =====
+SELECT e.name, d.dept_name 
+FROM employees e 
+CROSS JOIN departments d 
+LIMIT 5;
+
+-- ===== 7. SELF JOIN (Fixed NULL handling) =====
+SELECT e.name AS employee, m.name AS manager, e.salary
+FROM employees e 
+LEFT JOIN employees m ON e.manager_id = m.emp_id 
+ORDER BY COALESCE(m.name, 'No Manager'), e.name;[web:36]
+
+-- Managers with team size
+SELECT m.name AS manager, COUNT(e.emp_id) AS team_size
+FROM employees m 
+LEFT JOIN employees e ON m.emp_id = e.manager_id 
+GROUP BY m.emp_id, m.name;
+
+-- ===== 8. MULTI-TABLE JOINS =====
+SELECT c.cust_name, o.amount, o.order_date, e.name AS sales_rep
+FROM customers c 
+INNER JOIN orders o ON c.cust_id = o.cust_id 
+INNER JOIN employees e ON c.sales_rep_id = e.emp_id 
+ORDER BY o.amount DESC;
+
+-- ===== 9. ADVANCED ANALYTICS =====
+SELECT e.name AS rep, d.dept_name, SUM(o.amount) AS total_sales
+FROM employees e 
+INNER JOIN customers c ON e.emp_id = c.sales_rep_id 
+INNER JOIN orders o ON c.cust_id = o.cust_id 
+INNER JOIN departments d ON e.dept_id = d.dept_id
+GROUP BY e.emp_id, e.name, d.dept_id, d.dept_name
+ORDER BY total_sales DESC;
